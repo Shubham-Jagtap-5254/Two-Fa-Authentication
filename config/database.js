@@ -1,11 +1,9 @@
 const mongoose = require('mongoose');
-require('dotenv').config();
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.DB_URI, {
+    await mongoose.connect(process.env.MONGO_URI, {
       ssl: true,
-      tlsAllowInvalidCertificates: true, // For development, remove in production
     });
     console.log('MongoDB connected successfully');
   } catch (error) {
