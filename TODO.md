@@ -1,0 +1,4 @@
+- [ ] Update models/user.js to add name field
+- [ ] Update controllers/authController.js: modify signup to include name and add login function
+- [ ] Update routes/authRoutes.js to add POST /login route
+- [ ] Provide Postman details for signup and login APIs
