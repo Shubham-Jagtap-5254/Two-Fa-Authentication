@@ -1,7 +1,6 @@
 const express = require('express');
 const { signup, login, setup2FA, verify2FA, loginWith2FA } = require('../controllers/authController');
-// Assuming there's an auth middleware, e.g., requireAuth
-// const requireAuth = require('../middlewares/authMiddleware');
+const protect = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
@@ -15,11 +14,9 @@ router.post('/login', login);
 router.post('/login-2fa', loginWith2FA);
 
 // POST /api/auth/setup-2fa (requires authentication)
-// router.post('/setup-2fa', requireAuth, setup2FA);
-router.post('/setup-2fa', setup2FA); // Temporarily without middleware
+router.post('/setup-2fa', protect, setup2FA);
 
 // POST /api/auth/verify-2fa (requires authentication)
-// router.post('/verify-2fa', requireAuth, verify2FA);
-router.post('/verify-2fa', verify2FA); // Temporarily without middleware
+router.post('/verify-2fa', protect, verify2FA);
 
 module.exports = router;
