@@ -178,4 +178,52 @@ const loginWith2FA = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, setup2FA, verify2FA, loginWith2FA };
+// New endpoint to get QR code even when 2FA is already enabled
+const get2FAQRCode = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // If 2FA is not set up, generate new secret and QR code
+    if (!user.twoFactorSecret) {
+      const secret = speakeasy.generateSecret({
+        name: `Collage Project (${user.email})`,
+        issuer: 'Collage Project'
+      });
+
+      user.twoFactorSecret = secret.base32;
+      await user.save();
+
+      const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+      return res.status(200).json({
+        message: '2FA setup initiated',
+        secret: secret.base32,
+        qrCodeUrl
+      });
+    }
+
+    // If 2FA is already set up, regenerate QR code from existing secret
+    const secret = {
+      base32: user.twoFactorSecret,
+      otpauth_url: `otpauth://totp/Collage%20Project%20(${encodeURIComponent(user.email)})?secret=${user.twoFactorSecret}&issuer=Collage%20Project`
+    };
+
+    const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+    res.status(200).json({
+      message: '2FA QR code retrieved',
+      secret: user.twoFactorSecret,
+      qrCodeUrl
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { signup, login, setup2FA, verify2FA, loginWith2FA, get2FAQRCode };
