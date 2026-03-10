@@ -1,5 +1,5 @@
 const express = require('express');
-const { signup, login, setup2FA, verify2FA, loginWith2FA, get2FAQRCode } = require('../controllers/authController');
+const { signup, login, setup2FA, verify2FA, loginWith2FA, get2FAQRCode, get2FAQRCodeByUserId } = require('../controllers/authController');
 const protect = require('../middlewares/authMiddleware');
 
 const router = express.Router();
@@ -19,7 +19,10 @@ router.post('/setup-2fa', protect, setup2FA);
 // POST /api/auth/verify-2fa (requires authentication)
 router.post('/verify-2fa', protect, verify2FA);
 
-// POST /api/auth/get-2fa-qr (new endpoint - requires authentication, always returns QR code)
+// POST /api/auth/get-2fa-qr (requires authentication, always returns QR code)
 router.post('/get-2fa-qr', protect, get2FAQRCode);
+
+// POST /api/auth/get-2fa-qr-by-userid (new - uses userId directly, no auth required)
+router.post('/get-2fa-qr-by-userid', get2FAQRCodeByUserId);
 
 module.exports = router;

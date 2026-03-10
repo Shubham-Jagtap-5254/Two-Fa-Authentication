@@ -148,7 +148,12 @@ const loginWith2FA = async (req, res) => {
 
     if (user.twoFactorEnabled) {
       if (!token) {
-        return res.status(206).json({ message: '2FA token required', requires2FA: true });
+        // Return 206 with user info so frontend can get QR code
+        return res.status(206).json({ 
+          message: '2FA token required', 
+          requires2FA: true,
+          userId: user._id.toString()
+        });
       }
 
       const verified = speakeasy.totp.verify({
@@ -226,4 +231,57 @@ const get2FAQRCode = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, setup2FA, verify2FA, loginWith2FA, get2FAQRCode };
+// New endpoint to get QR code even when 2FA is already enabled (using userId directly)
+const get2FAQRCodeByUserId = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+    
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // If 2FA is not set up, generate new secret and QR code
+    if (!user.twoFactorSecret) {
+      const secret = speakeasy.generateSecret({
+        name: `Collage Project (${user.email})`,
+        issuer: 'Collage Project'
+      });
+
+      user.twoFactorSecret = secret.base32;
+      await user.save();
+
+      const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+      return res.status(200).json({
+        message: '2FA setup initiated',
+        secret: secret.base32,
+        qrCodeUrl
+      });
+    }
+
+    // If 2FA is already set up, regenerate QR code from existing secret
+    const secret = {
+      base32: user.twoFactorSecret,
+      otpauth_url: `otpauth://totp/Collage%20Project%20(${encodeURIComponent(user.email)})?secret=${user.twoFactorSecret}&issuer=Collage%20Project`
+    };
+
+    const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+    res.status(200).json({
+      message: '2FA QR code retrieved',
+      secret: user.twoFactorSecret,
+      qrCodeUrl
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { signup, login, setup2FA, verify2FA, loginWith2FA, get2FAQRCode, get2FAQRCodeByUserId };
