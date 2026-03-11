@@ -1,2 +1,4 @@
 - [x] Create middlewares/authMiddleware.js with protect function
 - [x] Update routes/authRoutes.js to add protect to setup-2fa and verify-2fa routes
+- [x] Add emailOtp and emailOtpExpires fields to User model
+- [x] Add send-otp and verify-otp routes to authRoutes.js

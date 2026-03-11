@@ -1,5 +1,5 @@
 const express = require('express');
-const { signup, login, setup2FA, verify2FA, loginWith2FA, get2FAQRCode, get2FAQRCodeByUserId } = require('../controllers/authController');
+const { signup, login, setup2FA, verify2FA, loginWith2FA, get2FAQRCode, get2FAQRCodeByUserId, sendEmailOtp, verifyEmailOtp } = require('../controllers/authController');
 const protect = require('../middlewares/authMiddleware');
 
 const router = express.Router();
@@ -24,5 +24,9 @@ router.post('/get-2fa-qr', protect, get2FAQRCode);
 
 // POST /api/auth/get-2fa-qr-by-userid (new - uses userId directly, no auth required)
 router.post('/get-2fa-qr-by-userid', get2FAQRCodeByUserId);
+
+// OTP Routes (Email verification via Brevo)
+router.post('/send-otp', sendEmailOtp);
+router.post('/verify-otp', verifyEmailOtp);
 
 module.exports = router;

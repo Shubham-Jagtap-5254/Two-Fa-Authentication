@@ -2,6 +2,52 @@ const User = require('../models/user');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
+const https = require('https');
+
+// Helper function to send email via Brevo
+const sendBrevoEmail = (toEmail, subject, htmlContent) => {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify({
+      sender: { email: process.env.BREVO_SENDER_EMAIL, name: 'Collage Project' },
+      to: [{ email: toEmail }],
+      subject: subject,
+      htmlContent: htmlContent
+    });
+
+    const options = {
+      hostname: 'api.brevo.com',
+      path: '/v3/smtp/email',
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': process.env.BREVO_API_KEY,
+        'content-type': 'application/json',
+        'content-length': data.length
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let responseBody = '';
+      res.on('data', (chunk) => { responseBody += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(JSON.parse(responseBody || '{}'));
+        } else {
+          console.error('Brevo API Error:', responseBody);
+          reject(new Error(`Brevo API returned status ${res.statusCode}`));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('Network Error:', error);
+      reject(error);
+    });
+
+    req.write(data);
+    req.end();
+  });
+};
 
 const signup = async (req, res) => {
   try {
@@ -284,4 +330,73 @@ const get2FAQRCodeByUserId = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, setup2FA, verify2FA, loginWith2FA, get2FAQRCode, get2FAQRCodeByUserId };
+const sendEmailOtp = async (req, res) => {
+  try {
+    // Safely handle undefined req.body
+    const email = req.body?.email;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save OTP and expiration (10 minutes) to user
+    // Note: Ensure 'emailOtp' and 'emailOtpExpires' fields exist in your User model schema
+    user.emailOtp = otp;
+    user.emailOtpExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    // Send email via Brevo
+    await sendBrevoEmail(
+      user.email,
+      'Your Login OTP',
+      `<html><body><h1>Your OTP Code</h1><p>Your verification code is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p></body></html>`
+    );
+
+    res.status(200).json({ message: 'OTP sent successfully to email' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error sending OTP' });
+  }
+};
+
+const verifyEmailOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (!user.emailOtp || !user.emailOtpExpires || Date.now() > user.emailOtpExpires) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    if (user.emailOtp !== otp) {
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
+    // Clear OTP after successful verification
+    user.emailOtp = undefined;
+    user.emailOtpExpires = undefined;
+    await user.save();
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    res.status(200).json({ message: 'OTP verified', token, user: { id: user._id, email: user.email, name: user.name } });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error verifying OTP' });
+  }
+};
+
+module.exports = { signup, login, setup2FA, verify2FA, loginWith2FA, get2FAQRCode, get2FAQRCodeByUserId, sendEmailOtp, verifyEmailOtp };
