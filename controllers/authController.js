@@ -63,15 +63,21 @@ const signup = async (req, res) => {
     const user = new User({ name, email, password });
     await user.save();
 
-    // Generate JWT token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '1h',
-    });
+    // Generate OTP for email verification
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.emailOtp = otp;
+    user.emailOtpExpires = Date.now() + 10 * 60 * 1000;
+
+    await sendBrevoEmail(
+      user.email,
+      'Email Verification - Complete Your Signup',
+      `<html><body><h1>Verify Your Email</h1><p>Your OTP: <strong style="font-size: 24px;">${otp}</strong></p><p>This code expires in 10 minutes.</p></body></html>`
+    );
+
+    await user.save();
 
     res.status(201).json({
-      message: 'User created successfully',
-      token,
-      user: { id: user._id, name: user.name, email: user.email },
+      message: 'User registered successfully. OTP sent to your email for verification.',
     });
   } catch (error) {
     console.error(error);
@@ -95,15 +101,21 @@ const login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Generate JWT token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '1h',
-    });
+    // Generate OTP for email verification
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.emailOtp = otp;
+    user.emailOtpExpires = Date.now() + 10 * 60 * 1000;
+
+    await sendBrevoEmail(
+      user.email,
+      'Login Verification - Enter OTP',
+      `<html><body><h1>Login Verification</h1><p>Your OTP: <strong style="font-size: 24px;">${otp}</strong></p><p>This code expires in 10 minutes.</p></body></html>`
+    );
+
+    await user.save();
 
     res.status(200).json({
-      message: 'Login successful',
-      token,
-      user: { id: user._id, name: user.name, email: user.email },
+      message: 'Login initiated. OTP sent to your email. Please verify.',
     });
   } catch (error) {
     console.error(error);
